@@ -6,6 +6,8 @@ import { validateAmount, formatAmount } from './utils/validateAmount';
 import { getFriendlyError } from './utils/errorMessages';
 import { useWebSocket } from './hooks/useWebSocket';
 import { makeVariants, tapScale } from './utils/animations';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { logError } from './utils/errorLogger';
 
 const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
 
@@ -62,6 +64,7 @@ function App() {
       setAccount(data);
       setSuccess('Account created! Save your secret key securely.');
     } catch (error) {
+      logError(error, { context: 'createAccount' });
       setError(error, createAccount);
     } finally { setLoading(''); }
   };
@@ -73,6 +76,7 @@ function App() {
       const { data } = await axios.get(`/api/stellar/account/${account.publicKey}`);
       setBalance(data);
     } catch (error) {
+      logError(error, { context: 'checkBalance' });
       setError(error, checkBalance);
     } finally { setLoading(''); }
   };
@@ -97,6 +101,7 @@ function App() {
       setSuccess(`Payment sent! Hash: ${data.hash}`);
       checkBalance();
     } catch (error) {
+      logError(error, { context: 'sendPayment' });
       setError(error, sendPayment);
     } finally { setLoading(''); }
   };
@@ -156,6 +161,7 @@ function App() {
 
             {/* Send Payment */}
             <motion.div className="section" variants={v.fadeSlide}>
+              <ErrorBoundary context="send-payment">
               <h3>Send Payment</h3>
               <div className="input-wrap">
                 <input
@@ -194,6 +200,7 @@ function App() {
               <motion.button onClick={sendPayment} {...tap} disabled={!recipientValid || !amountValid || loading === 'send'}>
                 Send {loading === 'send' && <Spinner />}
               </motion.button>
+              </ErrorBoundary>
             </motion.div>
 
             {/* Live Notifications */}
