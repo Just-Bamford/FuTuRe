@@ -2,6 +2,7 @@ import * as StellarSDK from '@stellar/stellar-sdk';
 import dotenv from 'dotenv';
 import { eventMonitor } from '../eventSourcing/index.js';
 import logger from '../config/logger.js';
+import prisma from '../db/client.js';
 
 dotenv.config();
 
@@ -28,6 +29,12 @@ export async function createAccount() {
     data: { publicKey, secretKey: pair.secret() },
     version: 1
   });
+
+  await prisma.user.upsert({
+    where: { publicKey },
+    update: {},
+    create: { publicKey },
+  }).catch(err => logger.warn('db.user.upsert.failed', { error: err.message }));
   
   return {
     publicKey,
@@ -102,6 +109,25 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
     data: { destination, amount, hash: result.hash },
     version: 1
   });
+
+  // Persist transaction — ensure both users exist first
+  await prisma.$transaction(async (tx) => {
+    const [sender, recipient] = await Promise.all([
+      tx.user.upsert({ where: { publicKey: sourcePublicKey }, update: {}, create: { publicKey: sourcePublicKey } }),
+      tx.user.upsert({ where: { publicKey: destination },    update: {}, create: { publicKey: destination } }),
+    ]);
+    await tx.transaction.create({
+      data: {
+        hash: result.hash,
+        assetCode: assetCode || 'XLM',
+        amount,
+        ledger: result.ledger ?? null,
+        successful: result.successful,
+        senderId: sender.id,
+        recipientId: recipient.id,
+      },
+    });
+  }).catch(err => logger.warn('db.transaction.save.failed', { error: err.message }));
   
   return {
     hash: result.hash,

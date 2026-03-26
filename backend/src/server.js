@@ -6,6 +6,8 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
 import logger from './config/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import { connectDB, checkDBHealth } from './db/client.js';
+import { runMigrations } from './db/migrate.js';
 import stellarRoutes from './routes/stellar.js';
 import { initWebSocket } from './services/websocket.js';
 import eventsRoutes from './routes/events.js';
@@ -38,6 +40,8 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use(requestLogger);
 
 // Initialize event sourcing
+await runMigrations();
+await connectDB();
 await eventMonitor.initialize();
 await auditLogger.initialize();
 
@@ -49,8 +53,14 @@ app.use('/api/security', securityRoutes);
 app.use('/api/load-testing', loadTestingRoutes);
 app.use('/api/chaos', chaosRoutes);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', network: process.env.STELLAR_NETWORK });
+app.get('/health', async (req, res) => {
+  const db = await checkDBHealth();
+  const status = db.status === 'ok' ? 'ok' : 'degraded';
+  res.status(db.status === 'ok' ? 200 : 503).json({
+    status,
+    network: process.env.STELLAR_NETWORK,
+    db,
+  });
 });
 
 const httpServer = createServer(app);

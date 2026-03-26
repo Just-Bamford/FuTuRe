@@ -8,12 +8,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
     "@stellar/stellar-sdk": "^12.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.3.1",
     "jsonwebtoken": "^9.0.0",
+    "pg": "^8.20.0",
+    "prisma": "^7.5.0",
     "qrcode": "^1.5.3",
     "speakeasy": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
