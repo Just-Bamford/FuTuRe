@@ -1,20 +1,31 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import dotenv from 'dotenv';
 import { eventMonitor } from '../eventSourcing/index.js';
 import logger from '../config/logger.js';
 import prisma from '../db/client.js';
+import { getConfig } from '../config/env.js';
 
-dotenv.config();
+let horizonServerUrl;
+let horizonServer;
 
-const server = new StellarSDK.Horizon.Server(process.env.HORIZON_URL);
-const isTestnet = process.env.STELLAR_NETWORK === 'testnet';
+function getHorizonServer() {
+  const { horizonUrl } = getConfig().stellar;
+  if (!horizonServer || horizonUrl !== horizonServerUrl) {
+    horizonServerUrl = horizonUrl;
+    horizonServer = new StellarSDK.Horizon.Server(horizonUrl);
+  }
+  return horizonServer;
+}
+
+function isTestnet() {
+  return getConfig().stellar.network === 'testnet';
+}
 
 export async function createAccount() {
   const pair = StellarSDK.Keypair.random();
   const publicKey = pair.publicKey();
   logger.info('stellar.createAccount', { publicKey });
   
-  if (isTestnet) {
+  if (isTestnet()) {
     await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
     logger.debug('stellar.friendbotFunded', { publicKey });
     await eventMonitor.publishEvent(publicKey, {
@@ -44,7 +55,7 @@ export async function createAccount() {
 
 export async function getBalance(publicKey) {
   logger.debug('stellar.getBalance', { publicKey });
-  const account = await server.loadAccount(publicKey);
+  const account = await getHorizonServer().loadAccount(publicKey);
   const balances = account.balances.map(b => ({
     asset: b.asset_type === 'native' ? 'XLM' : `${b.asset_code}:${b.asset_issuer}`,
     balance: b.balance
@@ -61,19 +72,24 @@ export async function getBalance(publicKey) {
 }
 
 export async function sendPayment(sourceSecret, destination, amount, assetCode = 'XLM') {
+  const { assetIssuer } = getConfig().stellar;
   const sourceKeypair = StellarSDK.Keypair.fromSecret(sourceSecret);
   const sourcePublicKey = sourceKeypair.publicKey();
   logger.info('stellar.sendPayment.start', { source: sourcePublicKey, destination, amount, assetCode });
 
-  const sourceAccount = await server.loadAccount(sourcePublicKey);
+  const sourceAccount = await getHorizonServer().loadAccount(sourcePublicKey);
   
+  if (assetCode !== 'XLM' && !assetIssuer) {
+    throw new Error('ASSET_ISSUER is required for non-XLM payments');
+  }
+
   const asset = assetCode === 'XLM' 
     ? StellarSDK.Asset.native() 
-    : new StellarSDK.Asset(assetCode, process.env.ASSET_ISSUER);
+    : new StellarSDK.Asset(assetCode, assetIssuer);
   
   const transaction = new StellarSDK.TransactionBuilder(sourceAccount, {
     fee: StellarSDK.BASE_FEE,
-    networkPassphrase: isTestnet 
+    networkPassphrase: isTestnet() 
       ? StellarSDK.Networks.TESTNET 
       : StellarSDK.Networks.PUBLIC
   })
@@ -89,7 +105,7 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
 
   let result;
   try {
-    result = await server.submitTransaction(transaction);
+    result = await getHorizonServer().submitTransaction(transaction);
   } catch (err) {
     logger.error('stellar.sendPayment.failed', { source: sourcePublicKey, destination, amount, assetCode, error: err.message });
     throw err;
@@ -136,17 +152,36 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
   };
 }
 
+export async function getTransactionHistory(publicKey, { limit = 10, cursor } = {}) {
+  let call = server.transactions().forAccount(publicKey).limit(limit).order('desc');
+  if (cursor) call = call.cursor(cursor);
+  const result = await call.call();
+  return {
+    publicKey,
+    transactions: result.records.map(tx => ({
+      id: tx.id,
+      hash: tx.hash,
+      createdAt: tx.created_at,
+      successful: tx.successful,
+      ledger: tx.ledger_attr,
+      pagingToken: tx.paging_token,
+    })),
+    nextCursor: result.records.at(-1)?.paging_token ?? null,
+  };
+}
+
 export async function getExchangeRate(from, to) {
   // Placeholder - integrate with price oracle or DEX
   return 1.0;
 }
 
 export async function getNetworkStatus() {
+  const { horizonUrl } = getConfig().stellar;
   try {
-    const root = await server.root();
+    const root = await getHorizonServer().root();
     const status = {
-      network: isTestnet ? 'testnet' : 'mainnet',
-      horizonUrl: process.env.HORIZON_URL,
+      network: isTestnet() ? 'testnet' : 'mainnet',
+      horizonUrl,
       online: true,
       horizonVersion: root.horizon_version,
       networkPassphrase: root.network_passphrase,
@@ -157,8 +192,8 @@ export async function getNetworkStatus() {
   } catch (err) {
     logger.warn('stellar.networkStatus.offline', { error: err.message });
     return {
-      network: isTestnet ? 'testnet' : 'mainnet',
-      horizonUrl: process.env.HORIZON_URL,
+      network: isTestnet() ? 'testnet' : 'mainnet',
+      horizonUrl,
       online: false,
     };
   }
