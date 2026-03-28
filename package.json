@@ -17,9 +17,14 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:parallel": "vitest run --workers 4",
-    "test:mobile": "cd mobile-tests && node run-tests.js"
+    "test:mobile": "cd mobile-tests && node run-tests.js",
+    "test:contracts:consumer": "vitest run --config vitest.contracts.config.js contracts/consumer",
+    "test:contracts:provider": "vitest run --config vitest.contracts.config.js contracts/provider",
+    "test:contracts:registry": "vitest run --config vitest.contracts.config.js contracts/registry.test.js",
+    "test:contracts": "npm run test:contracts:consumer && npm run test:contracts:provider && npm run test:contracts:registry"
   },
   "devDependencies": {
+    "@pact-foundation/pact": "^16.3.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "14.3.1",
     "@vitejs/plugin-react": "^6.0.1",
