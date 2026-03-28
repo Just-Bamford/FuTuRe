@@ -1,6 +1,7 @@
 import express from 'express';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import * as StellarService from '../services/stellar.js';
+import * as AMMService from '../services/amm.js';
 import { getRate, getAllRates, convert } from '../services/exchangeRate.js';
 import { broadcastToAccount } from '../services/websocket.js';
 import { validate, rules } from '../middleware/validate.js';
@@ -242,6 +243,71 @@ router.get('/network/status', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+router.post('/amm/pools/register', (req, res) => {
+  try {
+    res.json(AMMService.registerPool(req.body));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/amm/pools/:poolId', (req, res) => {
+  try {
+    res.json(AMMService.getPoolState(req.params.poolId));
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+});
+
+router.post('/amm/swap', (req, res) => {
+  try {
+    res.json(AMMService.executeSwap(req.body));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/amm/arbitrage/:assetA/:assetB', (req, res) => {
+  const opportunities = AMMService.detectArbitrageOpportunities([req.params.assetA, req.params.assetB]);
+  res.json({ opportunities });
+});
+
+router.post('/amm/strategies/run', (req, res) => {
+  try {
+    res.json(AMMService.runAutomatedStrategy(req.body));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/amm/liquidity/automate', (req, res) => {
+  try {
+    res.json(AMMService.automateLiquidityProvision(req.body));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/amm/yield/estimate', (req, res) => {
+  try {
+    res.json(AMMService.estimateYieldFarming(req.body));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/amm/analytics', (req, res) => {
+  res.json(AMMService.getAMMAnalytics());
+});
+
+router.get('/amm/risk', (req, res) => {
+  res.json(AMMService.runRiskChecks());
+});
+
+router.get('/amm/optimize', (req, res) => {
+  res.json(AMMService.optimizeAMMPerformance());
 });
 
 // Returns supported assets and their issuers
