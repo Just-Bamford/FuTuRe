@@ -64,6 +64,7 @@ describe('formatAmount', () => {
 - **Mocks**: Use the `vi.mock()` function from Vitest to simulate Stellar SDK responses.
 - **Fixtures**: Store common test data (e.g., sample public keys) in a dedicated `tests/fixtures` directory if they are used across multiple tests.
 - **Environment**: Use a `.env.test` file for test-specific configurations.
+- **Privacy**: Use synthetic data only. Run `npm run test:privacy` (already part of `npm test`) and use helpers in `testing/privacy.js` to generate and redact sensitive values.
 
 ## 6. Troubleshooting Guide
 
@@ -78,3 +79,34 @@ Before submitting a Pull Request, please ensure:
 - [ ] All existing tests pass (`npm test`).
 - [ ] Manual verification has been performed on the local development environment.
 - [ ] No sensitive keys or test account secrets are committed.
+
+## 8. Snapshot Testing
+
+Snapshot tests capture the rendered HTML structure of UI components and fail if the output changes unexpectedly. They live in `frontend/tests/snapshots.test.jsx`.
+
+### Running snapshot tests
+```bash
+npm test                        # runs all tests including snapshots
+```
+
+### Updating snapshots
+When a component's output intentionally changes (e.g. after a UI update), regenerate snapshots:
+```bash
+npm run test:update-snapshots
+```
+Then **review the diff in git** before committing — only commit snapshots whose changes you have verified are intentional.
+
+### Snapshot review process
+1. A failing snapshot in CI means the component's rendered output changed.
+2. Download the `snapshot-failures` artifact from the CI run to inspect the diff.
+3. If the change is intentional: run `npm run test:update-snapshots` locally, review the diff, commit the updated `.snap` files alongside the component change.
+4. If the change is unintentional: fix the component regression before merging.
+
+### What to snapshot
+- Pure presentational components (Spinner, FormField, NetworkBadge, etc.)
+- Components in their key states (empty, loaded, error, disabled)
+
+### What NOT to snapshot
+- Components with heavy external dependencies (live API calls, canvas, complex animations)
+- Rapidly changing prototype components
+- Test helper utilities
