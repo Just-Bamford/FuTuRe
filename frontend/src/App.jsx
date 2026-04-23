@@ -26,13 +26,10 @@ import { useTheme } from './contexts/ThemeContext';
 const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
 const TIMEOUT_MS = 30000;
 
-function withTimeout(promise) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out. Please try again.')), TIMEOUT_MS)
-    ),
-  ]);
+function withTimeout(promiseFn) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  return promiseFn(controller.signal).finally(() => clearTimeout(timer));
 }
 
 function App() {
@@ -112,7 +109,7 @@ function App() {
   const createAccount = async () => {
     setLoading('create');
     try {
-      const { data } = await withTimeout(axios.post('/api/stellar/account/create'));
+      const { data } = await withTimeout(signal => axios.post('/api/stellar/account/create', null, { signal }));
       setAccount(data);
       resetForm();
       msg.success('Account created! Save your secret key securely.');
@@ -139,7 +136,7 @@ function App() {
     if (!account) return;
     setLoading('balance');
     try {
-      const { data } = await withTimeout(axios.get(`/api/stellar/account/${account.publicKey}`));
+      const { data } = await withTimeout(signal => axios.get(`/api/stellar/account/${account.publicKey}`, { signal }));
       setBalance(data);
     } catch (error) {
       logError(error, { context: 'checkBalance' });
@@ -174,13 +171,7 @@ function App() {
     setLoading('send');
     const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM' };
     try {
-      const { data } = await axios.post('/api/stellar/payment/send', payload);
-      const { data } = await withTimeout(axios.post('/api/stellar/payment/send', {
-        sourceSecret: account.secretKey,
-        destination: recipient,
-        amount,
-        assetCode: 'XLM'
-      }));
+      const { data } = await withTimeout(signal => axios.post('/api/stellar/payment/send', payload, { signal }));
       msg.success(`Payment sent! Hash: ${data.hash}`);
       resetForm();
       checkBalance();

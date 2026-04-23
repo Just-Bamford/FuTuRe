@@ -72,10 +72,14 @@ export function TransactionHistory({ publicKey }) {
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState(null);
   const [filters, setFilters] = useState({ type: '', dateFrom: '', dateTo: '' });
-  const [cursors, setCursors] = useState([]); // stack for back-pagination
+  const [cursors, setCursors] = useState([]); // ring-buffer for back-pagination (max 50)
+  const [error, setError] = useState(null);
+
+  const MAX_CURSOR_HISTORY = 50;
 
   const fetchPage = useCallback(async (cursor = null, isBack = false) => {
     setLoading(true);
+    setError(null);
     try {
       const params = { limit: PAGE_SIZE, ...(cursor ? { cursor } : {}) };
       if (filters.type) params.type = filters.type;
@@ -88,10 +92,13 @@ export function TransactionHistory({ publicKey }) {
       setLoaded(true);
 
       if (!isBack && cursor) {
-        setCursors(prev => [...prev, cursor]);
+        setCursors(prev => {
+          const next = [...prev, cursor];
+          return next.length > MAX_CURSOR_HISTORY ? next.slice(next.length - MAX_CURSOR_HISTORY) : next;
+        });
       }
     } catch (e) {
-      // errors handled by parent via StatusMessage
+      setError(e?.response?.data?.error ?? e?.message ?? 'Failed to load transactions.');
     } finally {
       setLoading(false);
     }
@@ -133,7 +140,13 @@ export function TransactionHistory({ publicKey }) {
       </form>
 
       <AnimatePresence mode="wait">
-        {loaded && (
+        {error && (
+          <motion.div key="error" className="tx-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <p>{error}</p>
+            <button className="tx-page-btn" onClick={() => fetchPage(cursors[cursors.length - 1] ?? null)}>↺ Retry</button>
+          </motion.div>
+        )}
+        {!error && loaded && (
           <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {txs.length === 0 ? (
               <p className="tx-empty">No transactions found.</p>
