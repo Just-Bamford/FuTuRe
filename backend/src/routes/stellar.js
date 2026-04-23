@@ -48,7 +48,7 @@ router.post('/account/import', rules.importAccount, validate, async (req, res) =
     const keypair = StellarSDK.Keypair.fromSecret(secretKey);
     const publicKey = keypair.publicKey();
     const balance = await StellarService.getBalance(publicKey);
-    res.json({ publicKey, secretKey, balances: balance.balances });
+    res.json({ publicKey, balances: balance.balances });
   } catch (error) {
     res.status(400).json({ error: 'Invalid secret key or account not found on network' });
   }
@@ -219,6 +219,9 @@ router.get('/exchange-rate/:from/:to', rules.assetCodeParams, validate,
     try {
       const { from, to } = req.params;
       const rate = await getRate(from, to);
+      if (rate === null) {
+        return res.status(503).json({ error: `Exchange rate unavailable for ${from}/${to}: no liquidity in orderbook` });
+      }
       res.json({ from, to, rate });
     } catch (error) {
       res.status(500).json({ error: error.message });
