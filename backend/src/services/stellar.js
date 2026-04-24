@@ -105,11 +105,11 @@ export async function getBalance(publicKey) {
   return { publicKey, balances };
 }
 
-export async function sendPayment(sourceSecret, destination, amount, assetCode = 'XLM') {
+export async function sendPayment(sourceSecret, destination, amount, assetCode = 'XLM', memo = null) {
   const { assetIssuer } = getConfig().stellar;
   const sourceKeypair = StellarSDK.Keypair.fromSecret(sourceSecret);
   const sourcePublicKey = sourceKeypair.publicKey();
-  logger.info('stellar.sendPayment.start', { source: sourcePublicKey, destination, amount, assetCode });
+  logger.info('stellar.sendPayment.start', { source: sourcePublicKey, destination, amount, assetCode, memo });
 
   const sourceAccount = await getHorizonServer().loadAccount(sourcePublicKey);
   
@@ -121,7 +121,7 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
     ? StellarSDK.Asset.native() 
     : new StellarSDK.Asset(assetCode, getIssuer(assetCode));
   
-  const transaction = new StellarSDK.TransactionBuilder(sourceAccount, {
+  const txBuilder = new StellarSDK.TransactionBuilder(sourceAccount, {
     fee: StellarSDK.BASE_FEE,
     networkPassphrase: isTestnet() 
       ? StellarSDK.Networks.TESTNET 
@@ -131,9 +131,13 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
       destination,
       asset,
       amount: amount.toString()
-    }))
-    .setTimeout(30)
-    .build();
+    }));
+
+  if (memo) {
+    txBuilder.addMemo(StellarSDK.Memo.text(memo));
+  }
+
+  const transaction = txBuilder.setTimeout(30).build();
   
   transaction.sign(sourceKeypair);
 
@@ -178,11 +182,12 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
     hash: result.hash,
     ledger: result.ledger,
     feeBump: usedFeeBump,
+    memo,
   });
 
   await eventMonitor.publishEvent(sourcePublicKey, {
     type: 'PaymentSent',
-    data: { destination, amount, hash: result.hash, feeBump: usedFeeBump },
+    data: { destination, amount, hash: result.hash, feeBump: usedFeeBump, memo },
     version: 1
   });
 

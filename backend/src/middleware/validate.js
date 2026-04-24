@@ -75,6 +75,7 @@ export const rules = {
       .withMessage('Invalid asset code')
       .isIn(SUPPORTED_ASSETS)
       .withMessage(`Unsupported asset. Supported: ${SUPPORTED_ASSETS.join(', ')}`),
+    rules.memoField(),
   ],
 
   createTrustline: [

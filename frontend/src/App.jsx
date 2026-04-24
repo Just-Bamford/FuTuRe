@@ -40,6 +40,7 @@ function App() {
   const [balance, setBalance] = useState(null);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
   const [loading, setLoading] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -109,7 +110,7 @@ function App() {
 
   const resetForm = () => dispatch({ type: A.RESET_FORM });
 
-  const resetForm = () => { setRecipient(''); setAmount(''); };
+  const resetForm = () => { setRecipient(''); setAmount(''); setMemo(''); };
   const clearForm = () => {
     if (recipient || amount) { setConfirmClear(true); return; }
     resetForm();
@@ -191,7 +192,7 @@ function App() {
   const sendPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
     setLoading('send');
-    const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM' };
+    const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM', memo: memo || undefined };
 
     // Optimistic balance update (deduct amount + base fee to match on-chain deduction)
     const BASE_FEE_XLM = 0.00001;
@@ -642,6 +643,21 @@ function App() {
                         </motion.p>
                       )}
                     </AnimatePresence>
+
+                    <div className="input-wrap">
+                      <label htmlFor="memo-input" className="sr-only">Payment memo (optional, max 28 characters)</label>
+                      <input
+                        id="memo-input"
+                        type="text"
+                        placeholder="Memo (optional, max 28 chars)"
+                        value={memo}
+                        onChange={(e) => setMemo(e.target.value.slice(0, 28))}
+                        onKeyDown={(e) => e.key === 'Enter' && sendPayment()}
+                        aria-label="Payment memo (optional)"
+                        maxLength="28"
+                      />
+                      {memo && <span className="input-icon" aria-hidden="true">{memo.length}/28</span>}
+                    </div>
 
                     <FeeDisplay amount={amount} visible={amountValid} />
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
