@@ -114,17 +114,48 @@ export async function convert(amount, from, to) {
   return parseFloat((amount * rate).toFixed(7));
 }
 
-/** Fetch all supported pair rates at once. */
+/** Fetch all supported pair rates at once via a single batched CoinGecko request. */
 export async function getAllRates() {
-  const pairs = [];
+  // Collect assets that have a CoinGecko ID and aren't fully cached yet
+  const needed = SUPPORTED_ASSETS.filter(a => COINGECKO_IDS[a]);
+
+  // Single batched request: all coin IDs vs USD (USDC is pegged 1:1 to USD)
+  const pricesUsd = {};
+  try {
+    const ids = needed.map(a => COINGECKO_IDS[a]).join(',');
+    const apiKey = process.env.COINGECKO_API_KEY;
+    const headers = apiKey ? { 'x-cg-demo-api-key': apiKey } : {};
+    const res = await fetch(
+      `${COINGECKO_BASE}/simple/price?ids=${ids}&vs_currencies=usd`,
+      { headers, signal: AbortSignal.timeout(5_000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      for (const asset of needed) {
+        const usd = data[COINGECKO_IDS[asset]]?.usd;
+        if (usd != null) pricesUsd[asset] = usd;
+      }
+      lastFetchAt = Date.now();
+    }
+  } catch (err) {
+    logger.warn('exchangeRate.getAllRates.coingecko.failed', { error: err.message });
+  }
+
+  // Derive all pairs from USD prices, fall back to getRate for anything missing
+  const results = [];
   for (const from of SUPPORTED_ASSETS) {
     for (const to of SUPPORTED_ASSETS) {
-      if (from !== to) pairs.push({ from, to });
+      if (from === to) continue;
+      let rate = getCached(from, to);
+      if (rate == null && pricesUsd[from] != null && pricesUsd[to] != null) {
+        rate = pricesUsd[from] / pricesUsd[to];
+        setCache(from, to, rate);
+        notifyIfChanged(from, to, rate);
+      }
+      if (rate == null) rate = await getRate(from, to); // fallback (DEX / cache)
+      results.push({ from, to, rate });
     }
   }
-  const results = await Promise.all(pairs.map(async ({ from, to }) => ({
-    from, to, rate: await getRate(from, to),
-  })));
   return results;
 }
 
