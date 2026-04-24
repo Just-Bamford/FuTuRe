@@ -122,12 +122,12 @@ function App() {
     let anyFailed = false;
     for (const item of pendingItems) {
       try {
-        await withTimeout(axios.post('/api/stellar/payment/send', {
+        await withTimeout(signal => axios.post('/api/stellar/payment/send', {
           sourceSecret: replaySecret,
           destination: item.destination,
           amount: item.amount,
           assetCode: item.assetCode,
-        }));
+        }, { signal }));
         await dequeue(item.id);
       } catch (error) {
         anyFailed = true;
@@ -144,8 +144,6 @@ function App() {
   const createAccount = async () => {
     try {
       const { data } = await withTimeout(signal => axios.post('/api/stellar/account/create', null, { signal }));
-      setAccount(data);
-      const { data } = await withTimeout(axios.post('/api/stellar/account/create'));
       dispatch({ type: A.SET_ACCOUNT, payload: data });
       resetForm();
       msg.success('Account created! Save your secret key securely.');
@@ -158,7 +156,7 @@ function App() {
   const importAccount = async (secretKey) => {
     setLoading('import');
     try {
-      const { data } = await axios.post('/api/stellar/account/import', { secretKey });
+      const { data } = await withTimeout(signal => axios.post('/api/stellar/account/import', { secretKey }, { signal }));
       dispatch({ type: A.SET_ACCOUNT, payload: data });
       dispatch({ type: A.SET_SHOW_IMPORT, payload: false });
       msg.success('Account imported successfully!');
@@ -173,8 +171,6 @@ function App() {
     setLoading('balance');
     try {
       const { data } = await withTimeout(signal => axios.get(`/api/stellar/account/${account.publicKey}`, { signal }));
-      setBalance(data);
-      const { data } = await withTimeout(axios.get(`/api/stellar/account/${account.publicKey}`));
       dispatch({ type: A.SET_BALANCE, payload: data });
     } catch (error) {
       logError(error, { context: 'checkBalance' });
@@ -214,7 +210,6 @@ function App() {
 
     try {
       const { data } = await withTimeout(signal => axios.post('/api/stellar/payment/send', payload, { signal }));
-      const { data } = await withTimeout(axios.post('/api/stellar/payment/send', payload));
       msg.success(`Payment sent! Hash: ${data.hash}`);
       resetForm();
       checkBalance(); // sync real balance
