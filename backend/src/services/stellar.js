@@ -5,15 +5,39 @@ import { getIssuer } from '../config/assets.js';
 import logger from '../config/logger.js';
 import prisma from '../db/client.js';
 
-// In-memory fee bump usage stats for admin dashboard
-const feeBumpStats = { total: 0, totalFeeStroops: 0, accounts: new Set() };
-
-export function getFeeBumpStats() {
+export async function getFeeBumpStats() {
+  const row = await prisma.feeBumpStat.findUnique({ where: { id: 'singleton' } });
   return {
-    total: feeBumpStats.total,
-    totalFeeStroops: feeBumpStats.totalFeeStroops,
-    uniqueAccounts: feeBumpStats.accounts.size,
+    total: row?.total ?? 0,
+    totalFeeStroops: Number(row?.totalFeeStroops ?? 0),
+    uniqueAccounts: Array.isArray(row?.accounts) ? row.accounts.length : 0,
   };
+}
+
+async function incrementFeeBumpStats(sourcePublicKey, feeStroops) {
+  try {
+    // Upsert the singleton row, then atomically add the new account to the set
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.feeBumpStat.upsert({
+        where: { id: 'singleton' },
+        create: { id: 'singleton', total: 1, totalFeeStroops: feeStroops, accounts: [sourcePublicKey] },
+        update: {
+          total: { increment: 1 },
+          totalFeeStroops: { increment: feeStroops },
+        },
+      });
+      // Add account to set if not already present
+      const accounts = Array.isArray(existing.accounts) ? existing.accounts : [];
+      if (!accounts.includes(sourcePublicKey)) {
+        await tx.feeBumpStat.update({
+          where: { id: 'singleton' },
+          data: { accounts: [...accounts, sourcePublicKey] },
+        });
+      }
+    });
+  } catch (err) {
+    logger.warn('stellar.feeBumpStats.persist.failed', { error: err.message });
+  }
 }
 
 /**
