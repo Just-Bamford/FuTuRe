@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AddressBook } from './AddressBook';
+import { WebhookManager } from './WebhookManager';
 
 const ASSETS = ['XLM', 'USDC', 'EURC'];
 
@@ -103,6 +104,10 @@ export function AccountSettings({ publicKey, onClose }) {
             <div style={{ marginBottom: 16 }}>
               <p style={{ fontWeight: 600, marginBottom: 4 }}>Address Book</p>
               <AddressBook />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <WebhookManager accountId={publicKey} />
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
