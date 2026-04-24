@@ -239,7 +239,7 @@ function App() {
     try {
       const { data } = await withTimeout(signal => axios.post('/api/stellar/payment/send', payload, { signal }));
       const { data } = await withTimeout(axios.post('/api/stellar/payment/send', payload));
-      msg.success(`Payment sent! Hash: ${data.hash}`);
+      msg.success(`Payment sent! Hash: ${data.hash.slice(0, 8)}…`, { hash: data.hash });
       resetForm();
       checkBalance(); // sync real balance
     } catch (error) {
