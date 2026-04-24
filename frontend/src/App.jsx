@@ -40,13 +40,13 @@ function App() {
   const [balance, setBalance] = useState(null);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
-  const [memo, setMemo] = useState('');
+
   const [loading, setLoading] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const { account, balance, loading, recipient, amount, showQR, showImportForm, showShortcuts } = useAppState();
+  const { account, balance, loading, recipient, amount, memo, memoType, showQR, showImportForm, showShortcuts } = useAppState();
   const dispatch = useAppDispatch();
 
   const msg = useMessages();
@@ -110,7 +110,6 @@ function App() {
 
   const resetForm = () => dispatch({ type: A.RESET_FORM });
 
-  const resetForm = () => { setRecipient(''); setAmount(''); setMemo(''); };
   const clearForm = () => {
     if (recipient || amount) { setConfirmClear(true); return; }
     resetForm();
@@ -200,7 +199,7 @@ function App() {
   const sendPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
     setLoading('send');
-    const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM', memo: memo || undefined };
+    const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM', memo: memo || undefined, memoType: memo ? memoType : undefined };
 
     // Optimistic balance update (deduct amount + base fee to match on-chain deduction)
     const BASE_FEE_XLM = 0.00001;
@@ -664,18 +663,37 @@ function App() {
                     </AnimatePresence>
 
                     <div className="input-wrap">
-                      <label htmlFor="memo-input" className="sr-only">Payment memo (optional, max 28 characters)</label>
+                      <label htmlFor="memo-type-select" className="sr-only">Memo type</label>
+                      <select
+                        id="memo-type-select"
+                        value={memoType}
+                        onChange={(e) => dispatch({ type: A.SET_MEMO_TYPE, payload: e.target.value })}
+                        aria-label="Memo type"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <option value="text">Text</option>
+                        <option value="id">ID (exchange)</option>
+                      </select>
+                      <label htmlFor="memo-input" className="sr-only">
+                        {memoType === 'id' ? 'Numeric memo ID (required for exchange deposits)' : 'Payment memo (optional, max 28 characters)'}
+                      </label>
                       <input
                         id="memo-input"
-                        type="text"
-                        placeholder="Memo (optional, max 28 chars)"
+                        type={memoType === 'id' ? 'number' : 'text'}
+                        inputMode={memoType === 'id' ? 'numeric' : undefined}
+                        placeholder={memoType === 'id' ? 'Numeric memo ID (exchange deposit)' : 'Memo (optional, max 28 chars)'}
                         value={memo}
-                        onChange={(e) => setMemo(e.target.value.slice(0, 28))}
+                        onChange={(e) => {
+                          const val = memoType === 'id'
+                            ? e.target.value.replace(/\D/g, '').slice(0, 20)
+                            : e.target.value.slice(0, 28);
+                          dispatch({ type: A.SET_MEMO, payload: val });
+                        }}
                         onKeyDown={(e) => e.key === 'Enter' && sendPayment()}
-                        aria-label="Payment memo (optional)"
-                        maxLength="28"
+                        aria-label={memoType === 'id' ? 'Numeric memo ID for exchange deposit' : 'Payment memo (optional)'}
+                        maxLength={memoType === 'id' ? 20 : 28}
                       />
-                      {memo && <span className="input-icon" aria-hidden="true">{memo.length}/28</span>}
+                      {memo && memoType === 'text' && <span className="input-icon" aria-hidden="true">{memo.length}/28</span>}
                     </div>
 
                     <FeeDisplay amount={amount} visible={amountValid} />
