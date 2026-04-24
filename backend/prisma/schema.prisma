@@ -86,6 +86,8 @@ model PaymentStream {
   metadata        Json?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  @@index([status, lastProcessedAt])
 }
 
 model Notification {
