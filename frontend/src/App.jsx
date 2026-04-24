@@ -22,6 +22,7 @@ import { Spinner } from './components/Spinner';
 import { TransactionHistory } from './components/TransactionHistory';
 import { StreamPayment } from './components/StreamPayment';
 import { PathPayment } from './components/PathPayment';
+import { AccountSettings } from './components/AccountSettings';
 import { FeeDisplay } from './components/FeeDisplay';
 import { InlineConfirmation } from './components/InlineConfirmation';
 import { logError } from './utils/errorLogger';
@@ -70,6 +71,7 @@ function App() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showTxLookup, setShowTxLookup] = useState(false);
   const [deepLinkHash, setDeepLinkHash] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
   const [lastWsMessage, setLastWsMessage] = useState(null);
   const { theme, isDark, toggleTheme } = useTheme();
   useRTL();
@@ -417,6 +419,17 @@ function App() {
               >
                 🔍
               </button>
+              {account && (
+                <button
+                  type="button"
+                  className="shortcuts-help-btn"
+                  onClick={() => setShowSettings(true)}
+                  aria-label="Account settings"
+                  title="Account settings"
+                >
+                  ⚙️
+                </button>
+              )}
               <NetworkBadge status={networkStatus} />
               <motion.span
                 animate={{ opacity: [0.6, 1, 0.6] }}
@@ -902,6 +915,13 @@ function App() {
             />
           )}
         </AnimatePresence>
+
+        {showSettings && account && (
+          <AccountSettings
+            publicKey={account.publicKey}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
       </div>
     </>
   );
