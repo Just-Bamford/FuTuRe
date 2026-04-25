@@ -45,7 +45,6 @@ import { AMMPoolBrowser } from './components/AMMPoolBrowser';
 import { ConvertWidget } from './components/ConvertWidget';
 import { AccountRecovery } from './components/AccountRecovery';
 
-const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
 const TIMEOUT_MS = 30000;
 const KYC_LARGE_TRANSACTION_LIMIT = 1000;
 
@@ -485,7 +484,7 @@ function App() {
                 aria-label={`WebSocket status: ${wsStatus}`}
                 role="status"
               >
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: STATUS_COLORS[wsStatus], display: 'inline-block' }} aria-hidden="true" />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: `var(--ws-${wsStatus})`, display: 'inline-block' }} aria-hidden="true" />
                 <span aria-hidden="true">{wsStatus}</span>
               </motion.span>
             </div>
